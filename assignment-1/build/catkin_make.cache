@@ -1,2 +1,0 @@
-.
--DCATKIN_DEVEL_PREFIX=/home/pulkit/sc-627-assignments/assignment-1/devel -DCMAKE_INSTALL_PREFIX=/home/pulkit/sc-627-assignments/assignment-1/install -G Unix Makefiles

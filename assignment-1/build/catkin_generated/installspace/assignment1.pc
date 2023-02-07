@@ -1,8 +1,0 @@
-prefix=/home/pulkit/sc-627-assignments/assignment-1/install
-
-Name: assignment1
-Description: Description of assignment1
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
