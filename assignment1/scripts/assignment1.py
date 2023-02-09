@@ -6,15 +6,14 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-
 STUCK_THRESHOLD = 0.2
-LINEAR_SPEED = 0.2
+LINEAR_SPEED = 0.16
 ANGULAR_SPEED = 0.2
 
 class bug1():
 
     def __init__(self) -> None:
-        self.LINE_IDENTIFIER = 0
+        self.position_list = []
         self.current_position = [0, 0, 0] # initialize the current position to origin
         self.goal_position = [2.5, -2.5, 0] 
         self.dist_to_goal = np.sqrt((self.goal_position[0]-self.current_position[0])**2 + (self.goal_position[1]-self.current_position[1])**2)
@@ -22,12 +21,10 @@ class bug1():
         self.is_stuck = False # initialize the stuck flag to False
         self.goal_reached = False
         self.found_exit = False
-        self.stuck_count = 0
         self.heading = 0 # initialize the heading array to 0
         self.hit_point = [0, 0, 0] # initialize the hit point to origin
         self.move_the_bot = None
         self.circumnavigating = False
-        self.rearrival = False
         self.start_circum_pt = None
         self.exit_circum_pt = None
         self.count = 0
@@ -52,16 +49,17 @@ class bug1():
         #     self.move_the_bot.linear.x = 0.0
         #     self.move_the_bot.angular.z = ANGULAR_SPEED
 
-        if np.abs(np.argmin(laserdata.ranges) - 80) > 5:
+        if np.abs(np.argmin(laserdata.ranges) - 81) > 4:
             self.turning = True
             print(np.argmin(laserdata.ranges))
             self.move_the_bot.linear.x = 0.0
-            self.move_the_bot.angular.z = ANGULAR_SPEED
+            if np.argmin(laserdata.ranges) - 81 >0 : self.move_the_bot.angular.z = ANGULAR_SPEED
+            else : self.move_the_bot.angular.z = -ANGULAR_SPEED
 
         else:
             self.turning = False
             print("moving directly towards next point on boundary")
-            self.move_the_bot.linear.x = 0.5*LINEAR_SPEED
+            self.move_the_bot.linear.x = 0.3*LINEAR_SPEED
             self.move_the_bot.angular.z = 0.0
 
         # print("using this")
@@ -76,6 +74,7 @@ class bug1():
         orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
         (roll, pitch, yaw) = euler_from_quaternion (orientation_list)
         self.heading = yaw%(2*np.pi)
+        self.position_list.append(self.current_position)
         # print(yaw)
 
     def laserdata_callback(self, msg):
@@ -95,12 +94,15 @@ class bug1():
             self.goal_reached = True
             self.move_the_bot.linear.x = 0.0
             self.move_the_bot.angular.z = 0.0
+            with open("example.txt", "w") as f:
+                f.write(str(self.position_list))
 
         elif not self.circumnavigating and np.abs(self.heading - self.IDEAL_HEADING) > np.pi/30 and ((np.min(msg.ranges) > STUCK_THRESHOLD or self.count > 500)):
             # print("turning to head directly")
             # print("Ideal Heading: " + str(self.IDEAL_HEADING) + " Current Heading: " + str(self.heading))
             self.move_the_bot.linear.x = 0.0
-            self.move_the_bot.angular.z = ANGULAR_SPEED
+            if self.heading > self.IDEAL_HEADING: self.move_the_bot.angular.z = -ANGULAR_SPEED
+            else: self.move_the_bot.angular.z = ANGULAR_SPEED
             # if self.count > 300: self.count -= 100
             # if self.count <= 300: self.count = 0
             
@@ -141,7 +143,7 @@ class bug1():
             else:
                 self.wall_follow(msg)
                 self.count += 1
-                if(self.dist_to_goal < np.sqrt(  (self.exit_circum_pt[0] - self.goal_position[0])**2 + (self.exit_circum_pt[1] - self.goal_position[1])**2  )) or self.count == 1:
+                if (self.dist_to_goal < np.sqrt(  (self.exit_circum_pt[0] - self.goal_position[0])**2 + (self.exit_circum_pt[1] - self.goal_position[1])**2  )) or self.count == 1:
                     self.exit_circum_pt = self.current_position
 
         else:
