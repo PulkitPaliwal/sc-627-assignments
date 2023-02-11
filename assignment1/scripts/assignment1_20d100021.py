@@ -6,16 +6,16 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-STUCK_THRESHOLD = 0.22
-LINEAR_SPEED = 0.7
-ANGULAR_SPEED = 0.7
+STUCK_THRESHOLD = 0.2
+LINEAR_SPEED = 0.16
+ANGULAR_SPEED = 0.2
 
 class bug1():
 
     def __init__(self) -> None:
         self.position_list = []
         self.current_position = [0, 0, 0] # initialize the current position to origin
-        self.goal_position = [2, -2, 0] 
+        self.goal_position = [2.5, -2.5, 0] 
         self.dist_to_goal = np.sqrt((self.goal_position[0]-self.current_position[0])**2 + (self.goal_position[1]-self.current_position[1])**2)
         self.dist_to_goal_prev = self.dist_to_goal
         self.is_stuck = False # initialize the stuck flag to False
@@ -32,22 +32,34 @@ class bug1():
         self.turning = False
         self.distance_to_closest_obs = None
         self.angle_of_closest_obs = None
-        self.bigcount = 0
 
     def wall_follow(self, laserdata):
+        # need to maintain left region values
+        # if not self.turning:
+        #     self.angle_of_closest_obs = np.argmin(laserdata.ranges)
+        #     print(self.angle_of_closest_obs)
+        #     self.IDEAL_HEADING  = (self.heading + self.angle_of_closest_obs*np.pi/180 - np.pi/2 - np.pi/90) %(2*np.pi)
+        #     print(self.IDEAL_HEADING*180/np.pi)
+        #     print(self.heading*180/np.pi)
 
-        if np.abs(360/np.int(np.shape(laserdata.ranges)[0])*np.argmin(laserdata.ranges) - 81) > 10:
+        # if np.abs((self.heading - self.IDEAL_HEADING)%(2*np.pi)) > np.pi/36:
+        #     self.turning = True
+        #     print("turning to head along wall")
+        #     print("Ideal Heading: " + str(self.IDEAL_HEADING) + " Current Heading: " + str(self.heading))
+        #     self.move_the_bot.linear.x = 0.0
+        #     self.move_the_bot.angular.z = ANGULAR_SPEED
+
+        if np.abs(np.argmin(laserdata.ranges) - 81) > 4:
             self.turning = True
-            print(360/np.int(np.shape(laserdata.ranges)[0])*np.argmin(laserdata.ranges))
+            print(np.argmin(laserdata.ranges))
             self.move_the_bot.linear.x = 0.0
-            if 360/224*np.argmin(laserdata.ranges) - 90 >0 : self.move_the_bot.angular.z = ANGULAR_SPEED
+            if np.argmin(laserdata.ranges) - 81 >0 : self.move_the_bot.angular.z = ANGULAR_SPEED
             else : self.move_the_bot.angular.z = -ANGULAR_SPEED
-            # self.move_the_bot.angular.z = ANGULAR_SPEED
 
         else:
             self.turning = False
             print("moving directly towards next point on boundary")
-            self.move_the_bot.linear.x = 0.2*LINEAR_SPEED
+            self.move_the_bot.linear.x = 0.3*LINEAR_SPEED
             self.move_the_bot.angular.z = 0.0
 
         # print("using this")
@@ -66,10 +78,11 @@ class bug1():
         # print(yaw)
 
     def laserdata_callback(self, msg):
-        self.bigcount += 1
+        rt = 180
+        # self.move_the_bot.angular.z = 0.0
+        # print(self.heading)
+        # print(self.current_position)
         msg.ranges = np.array(msg.ranges)
-        msg.ranges[msg.ranges == 0] = 10
-        # print(np.shape(msg.ranges))
         # print(np.count_nonzero(msg.ranges > STUCK_THRESHOLD))
         if not self.circumnavigating:
             self.IDEAL_HEADING = np.arctan2((self.goal_position[1] - self.current_position[1]),(self.goal_position[0] - self.current_position[0]))
@@ -88,7 +101,7 @@ class bug1():
             # print("turning to head directly")
             # print("Ideal Heading: " + str(self.IDEAL_HEADING) + " Current Heading: " + str(self.heading))
             self.move_the_bot.linear.x = 0.0
-            if self.bigcount > 100 and self.heading > self.IDEAL_HEADING: self.move_the_bot.angular.z = -ANGULAR_SPEED
+            if self.heading > self.IDEAL_HEADING: self.move_the_bot.angular.z = -ANGULAR_SPEED
             else: self.move_the_bot.angular.z = ANGULAR_SPEED
             # if self.count > 300: self.count -= 100
             # if self.count <= 300: self.count = 0
@@ -122,7 +135,7 @@ class bug1():
                 self.move_the_bot.linear.x = 0.0
                 self.move_the_bot.angular.z = ANGULAR_SPEED
 
-            elif np.sqrt((self.current_position[0]-self.start_circum_pt[0])**2 + (self.current_position[1]-self.start_circum_pt[1])**2) < 0.15 and self.count > 150 and not self.found_exit:
+            elif np.sqrt((self.current_position[0]-self.start_circum_pt[0])**2 + (self.current_position[1]-self.start_circum_pt[1])**2) < 0.1 and self.count > 300 and not self.found_exit:
                 self.found_exit = True
                 self.wall_follow(msg)
                 self.count += 1
@@ -134,8 +147,8 @@ class bug1():
                     self.exit_circum_pt = self.current_position
 
         else:
-            self.move_the_bot.linear.x = 0.02
-            self.move_the_bot.angular.z = 0.02  
+            self.move_the_bot.linear.x = 0.01
+            self.move_the_bot.angular.z = 0.01
             print(np.min(msg.ranges))
         publish_to_cmd_vel.publish(self.move_the_bot) 
 
@@ -144,10 +157,10 @@ if __name__ == "__main__":
     bug1follower = bug1()
     bug1follower.move_the_bot = Twist()
     rospy.init_node('turtlebot_controller_node')
-    subscribe_to_odom = rospy.Subscriber('/tb3_3/odom', Odometry, callback= bug1follower.odom_callback)
-    subscribe_to_laser = rospy.Subscriber('/tb3_3/scan', LaserScan, callback = bug1follower.laserdata_callback)
+    subscribe_to_odom = rospy.Subscriber('odom', Odometry, callback= bug1follower.odom_callback)
+    subscribe_to_laser = rospy.Subscriber('/scan', LaserScan, callback = bug1follower.laserdata_callback)
     rospy.loginfo('My node has been started')
-    publish_to_cmd_vel = rospy.Publisher('/tb3_3/cmd_vel', Twist, queue_size = 10)
+    publish_to_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size = 10)
     rospy.spin()
 
 
