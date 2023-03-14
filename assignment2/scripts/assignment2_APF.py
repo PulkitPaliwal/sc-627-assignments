@@ -53,7 +53,7 @@ class APF():
     def get_distance(self, point1, point2):
         return np.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
 
-    def normalize_angle(self, angle):
+    def angle_in_minpi_to_pi(self, angle):
         if(math.fabs(angle) > math.pi):
             angle = angle - (2 * math.pi * angle) / (math.fabs(angle))
         return angle
@@ -97,7 +97,7 @@ class APF():
         F_rep_total = F_rep_total- f[0]
         F_total = self.F_att() + F_rep_total
         desired_yaw = math.atan2(F_total[1], F_total[0])
-        err_yaw = self.normalize_angle(desired_yaw - self.yaw)
+        err_yaw = self.angle_in_minpi_to_pi(desired_yaw - self.yaw)
         rospy.loginfo(err_yaw)
         if math.fabs(err_yaw) > permitted_yaw_error:
             self.move_the_bot.angular.z = 0.233 if err_yaw > 0 else -0.233
@@ -164,8 +164,6 @@ class APF():
                     f.write(str(self.path))
                 exit()
             rate.sleep()
-
-
+            rospy.spin()
 APF_bot = APF()
 APF_bot.main()
-rospy.spin()
